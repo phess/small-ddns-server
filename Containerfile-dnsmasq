@@ -1,0 +1,34 @@
+FROM ubi9
+MAINTAINER Pablo N. Hess <phess@phess.org>
+
+ENV UDPPORT 53/tcp
+ENV TCPPORT 53/udp
+
+# update and install dependencies
+RUN dnf clean all && \
+    dnf -y update && \
+    dnf -y install bind-utils dnsmasq && \
+    dnf clean all && \
+    rm -fr /var/log/dnf /var/log/yum /var/log/rpm
+
+# create directory and mount sources there
+ADD dnsmasq-filesystem/etc/dnsmasq.d/* /etc/dnsmasq.d/
+
+# Comment out line that says interfaces=lo in dnsmasq.conf
+RUN sed -i '/^interface=/s,^,#,' /etc/dnsmasq.conf
+
+# export volume
+VOLUME /etc/dnsmasq.d/hosts.d
+
+# expose network port
+EXPOSE ${UDPPORT}
+EXPOSE ${TCPPORT}
+
+# set user
+USER root
+
+ENV OPTIONS="-k -c 0"
+
+# define command to start container
+ENTRYPOINT /usr/sbin/dnsmasq ${OPTIONS}
+

@@ -1,0 +1,81 @@
+---
+# deploy_coredns.yml
+
+- name: Stop coredns if it's already up
+  systemd_service:
+    name: "{{ coredns_systemd_service_name }}"
+    state: stopped
+    scope: user
+    daemon_reload: true
+  timeout: 5
+  ignore_errors: true
+
+- name: Ensure ports 53/udp and 53/tcp are free
+  block:
+    - name: Grab port state for 53/udp and 53/tcp
+      ansible.builtin.shell: |
+        ss -plutn --no-header src :53
+      register: ss_port_53
+
+    - name: Fail if either 53/udp or 53/tcp is already taken
+      ansible.builtin.fail:
+        msg: "Port 53/tcp or 53/udp is already bound to: {{ ss_port_53.stdout }}"
+      when: "'0.0.0.0:53' in ss_port_53.stdout"
+
+- name: Ensure unprivileged users can bind to ports 53/udp and 53/tcp
+  become: yes
+  become_user: root
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_unprivileged_port_start
+    value: 53
+    sysctl_file: /etc/sysctl.d/ddns.conf
+    reload: true
+
+- name: Ensure dns server directory structure exists
+  ansible.builtin.file:
+    name: "{{ item }}"
+    state: directory
+    setype: "container_file_t"
+  loop:
+    - "{{ coredns_content_dir }}"
+    - "{{ hostsfiles_dir }}"
+  
+- name: Deploy Corefile
+  ansible.builtin.template:
+    src: Corefile.j2
+    dest: "{{ coredns_content_dir }}/Corefile"
+
+- name: Deploy blank zone files
+  ansible.builtin.template:
+    src: blank-zonefile.j2
+    dest: "{{ hostsfiles_dir }}/{{ item }}.zonefile"
+  loop: "{{ ddns_domains }}"
+
+
+- name: Create quadlet file
+  containers.podman.podman_container:
+    name: ddns-coredns
+    image: "{{ coredns_image }}"
+    state: quadlet
+    detach: true
+    pull: "{{ coredns_image_pullpolicy }}"
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+    volumes:
+      - "{{ coredns_content_dir }}:/etc/coredns:z"
+      - "{{ hostsfiles_dir }}:/etc/hostsfiles:z"
+    command: "-conf /etc/coredns/Corefile"
+    quadlet_options: 
+      - "AutoUpdate=registry"
+      - |
+        [Install]
+        WantedBy=default.target
+
+- name: Start coredns service (quadlet)
+  ansible.builtin.systemd_service:
+    name: "{{ coredns_systemd_service_name }}"
+    scope: user
+    daemon_reload: true
+    state: started
+

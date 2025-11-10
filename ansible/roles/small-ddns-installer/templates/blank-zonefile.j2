@@ -1,0 +1,13 @@
+$TTL 30 ; default TTL for zone (30 seconds)
+$ORIGIN {{ item }}.
+@       30 IN   SOA {{ ddns_fqdn }}. {{ ddns_admin_email | default('root@localhost.localdomain') | replace('@', '.') }}.
+                                2024100204 ; serial
+                                60       ; refresh (1 minute)
+                                30       ; retry (30 seconds)
+                                ;1209600    ; expire (2 weeks)
+                                30    ; expire (30 seconds)
+                                30         ; minimum a.k.a. negative cache(30 seconds)
+                                )
+
+        30 IN NS {{ ddns_fqdn }}.
+

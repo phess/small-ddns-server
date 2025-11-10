@@ -1,0 +1,18 @@
+{% for ddns_domain in ddns_domains %}
+
+{{ ddns_domain}} {
+  header {
+    response set ra # set RecursionAvailable flag
+  }
+
+  hosts /etc/hostsfiles/{{ ddns_domain }} {
+    ttl 5
+    fallthrough {{ ddns_domain }}
+  }
+#  file /etc/coredns/{{ ddns_domain }}.zonefile
+  log . {combined} {
+    class denial error
+  }
+}
+
+{% endfor %}

@@ -1,0 +1,32 @@
+---
+### tasks/main.yml
+# Use this file to do the usual tasks stuff or call other yml files from under tasks/.
+
+
+# Load variables.
+#- name: Load variables
+#  include_vars: main.yml
+#  tags: always
+
+#- include: install_python3.yml
+#- include: setup_sshd.yml
+#  tags:
+#    - deploy_sshd
+
+#- include: deploy_listener.yml
+#  tags:
+#    - deploy_listener
+
+ - import_tasks: rpm_requirements.yml
+
+ - import_tasks: deploy_coredns.yml
+   tags:
+     - deploy_coredns
+
+ - import_tasks: deploy_listener.yml
+   tags:
+     - deploy_listener
+
+ - import_tasks: dbseed.yml
+   tags:
+     - dbseed

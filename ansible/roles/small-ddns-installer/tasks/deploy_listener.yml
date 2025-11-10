@@ -1,0 +1,85 @@
+---
+# deploy_listener.yml
+
+- name: Stop listener if it's already up
+  systemd_service:
+    name: "{{ listener_systemd_service_name }}"
+    state: stopped
+  timeout: 5
+  ignore_errors: true
+
+- name: Debug listener_https_port
+  ansible.builtin.debug:
+    var: listener_https_port
+
+
+- name: Ensure port HTTPS port is free
+  block:
+    - name: "Grab port state for {{ listener_https_port }}/tcp"
+      ansible.builtin.shell: |
+        ss -pltn src :{{ listener_https_port }}
+      register: ss_listener_port
+
+    - name: "Fail if {{ listener_https_port }}/tcp is already taken"
+      ansible.builtin.fail:
+        msg: "Port {{ listener_https_port }} is already bound to: {{ ss_listener_port.stdout }}"
+      when: '"0.0.0.0:{{ listener_https_port | string }} " in ss_listener_port.stdout'
+
+- name: Ensure dns server directory structure exists
+  ansible.builtin.file:
+    name: "{{ item }}"
+    state: directory
+    setype: "container_file_t"
+  loop:
+    - "{{ listener_content_dir }}"
+    - "{{ hostsfiles_dir }}"
+    - "{{ listener_db_dir }}"
+
+- name: Deploy certs
+  block:
+    - name: Deploy cert file
+      ansible.builtin.copy:
+        src: "{{ tls_cert_file }}"
+        dest: "{{ listener_ssl_cert }}"
+    - name: Deploy key file
+      ansible.builtin.copy:
+        src: "{{ tls_key_file }}"
+        dest: "{{ listener_ssl_key }}"
+    - name: Deploy CA cert file
+      ansible.builtin.copy:
+        src: "{{ tls_cacert_file }}"
+        dest: "{{ listener_ssl_cacert }}"
+  
+- name: Create quadlet file
+  containers.podman.podman_container:
+    name: "{{ listener_systemd_service_name }}"
+    image: "{{ listener_image }}"
+    state: quadlet
+    detach: true
+    pull: "{{ listener_image_pullpolicy }}"
+    env:
+      ## SSL_* are relative to `/etc/ddns/` inside the container, i.e. filenames only.
+      SSL_CERT: "tls_cert.crt.pem" 
+      SSL_KEY: "tls_cert.key.pem"
+      SSL_CA: "cacert.pem"
+      DDNS_DOMAINS: "{{ ','.join(ddns_domains) }}"
+      DDNS_HOSTNAME: "{{ ddns_fqdn }}"
+      DDNS_LISTEN_PORT: "{{ listener_https_port }}"
+    ports:
+      - "{{ listener_https_port }}:8443/tcp"
+    volumes:
+      - "{{ listener_content_dir }}:/etc/ddns:z"
+      - "{{ hostsfiles_dir }}:/etc/hostsfiles:z"
+      - "{{ listener_db_dir }}:/var/lib/ddns:z"
+    quadlet_options:
+      - "AutoUpdate=registry"
+      - |
+        [Install]
+        WantedBy=default.target
+
+- name: Start the ddns-listener container
+  systemd_service:
+    scope: user
+    name: "{{ listener_systemd_service_name }}"
+    state: started
+    daemon_reload: true

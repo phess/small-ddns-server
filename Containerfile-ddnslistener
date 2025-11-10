@@ -1,0 +1,68 @@
+### ddns-listener container file
+
+FROM ubi9:latest
+MAINTAINER Pablo N. Hess <phess@phess.org>
+
+LABEL description="small-ddns-server's dynamic DNS http-based listener application" \
+      io.k8s.description="dynamic DNS http-based listener application" \
+      io.openshift.expose-services="8443:http" \
+      io.openshift.tags="python3, web server, aiohttp"
+
+ENV PORT 8443
+
+# install RPMs from ubi9 repo
+RUN dnf -y install python3 sqlite
+
+# enable epel9
+RUN dnf -y --nogpgcheck install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+
+# install python3-aiohttp
+RUN dnf -y install python3-aiohttp
+
+
+
+# Remove all dnf cache files after all dnf actions are done
+RUN dnf clean all
+
+# deploy application files
+ADD ddns-filesystem/usr/bin/ddns-listener.py /usr/bin/
+RUN chmod +X /usr/bin/ddns-listener.py
+
+# export port $PORT
+EXPOSE ${PORT}
+
+# Env variables
+# DOMAINS: comma-separated list of domains this ddns server will serve
+ENV DOMAINS "example.com,example.net"
+
+# DDNS_FQDN: fqdn of this DDNS serer. Only a single value is allowed
+env DDNS_FQDN "ddns.example.com"
+
+# ADMIN: admin email
+ENV ADMIN "root@localhost"
+
+# MAX_LENGTH: maximum hostname length not counting the domain name
+ENV MAX_LENGTH 40
+
+# SSL cert and key
+ENV SSL_CERT "ssl_cert.pem"
+ENV SSL_KEY "ssl_key.pem"
+ENV SSL_CA "ssl_cabundle.pem"
+
+# DEBUG mode
+ENV DDNS_DEBUG "y"
+
+# SSL cert path
+#ENV SSL_CERT_PATH "/etc/ddns"
+
+#ENV SSL_CERT "${SSL_CERT_PATH}/${SSL_CERT}"
+#ENV SSL_KEY "${SSL_CERT_PATH}/${SSL_KEY}"
+#ENV SSL_CA "${SSL_CERT_PATH}/${SSL_CA}"
+
+VOLUME /etc/ddns/
+VOLUME /var/lib/ddns/
+VOLUME /etc/hosts.d/
+
+# define command to start container
+ENTRYPOINT /usr/bin/ddns-listener.py
+#ENTRYPOINT /bin/sleep 9999999999

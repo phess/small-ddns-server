@@ -1,0 +1,104 @@
+---
+# setup_sshd.yml
+
+- name: Install openldap-clients in case the ssh-pubkey script needs it
+  become: true
+  become_user: root
+  package:
+    name: openldap-clients
+    state: installed
+
+- name: Deploy user authorization script to /usr/local/bin/
+  become: true
+  become_user: root
+  ansible.builtin.copy:
+    src: "{{ ssh_auth_script }}"
+    dest: "/usr/local/bin/"
+    perm: 0755
+    owner: root
+    group: root
+
+- name: Deploy sshd config drop-in file to configure DDNS users and authentication
+  become: true
+  become_user: root
+  ansible.builtin.template:
+    path: "/etc/ssh/sshd_config.d/10-ddns.conf"
+    state: present
+    src: ddns-sshd.conf.j2
+  notify:
+    - restart_sshd
+
+      
+
+- name: Create local user _ddns
+  user:
+    name: _ddns
+    create_home: yes
+    state: present
+    groups:
+      - wheel
+    local: yes
+    generate_ssh_key: yes
+
+- name: "Deploy the menu script to {{ menu_script }}"
+  copy:
+    src: pubkey_from_ldap.sh
+    dest: "{{ ddns_binpath }}/pubkey_from_ldap.sh"
+    mode: 0755
+  notify:
+    - restart_sshd
+
+- name: Ensure the menu script is in place for sshd to ForceCommand it
+  copy:
+    src: ddns-cli-menu.py
+    dest: "{{ ddns_binpath }}/ddns-cli-menu.py"
+    mode: 0755
+  notify:
+    - restart_sshd
+
+- name: Allow the _ddns user to ssh in
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: |
+      Match User _ddns
+        ForceCommand none
+  notify:
+    - restart_sshd
+
+- name: Allow the root user to ssh in
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: |
+      Match User root
+        ForceCommand none
+  notify:
+    - restart_sshd
+
+- name: Allow the wheel group to ssh in
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: |
+      Match Group wheel
+        ForceCommand none
+  notify:
+    - restart_sshd
+
+### This task needs to be the last one
+- name: Ensure sshd will force only user1 into the ddns menu
+  lineinfile:
+    path: "/etc/ssh/sshd_config"
+    state: present
+    line: |
+      Match User user1
+        ForceCommand {{ menu_script }}
+  notify:
+    - restart_sshd
+
+- name: Ensure the directory under the user home area is around
+  ansible.builtin.file:
+      path: /home/_ddns/container-files/ddns-config
+      state: directory
+      mode: '0755'
+      owner: _ddns
+      group: _ddns
+      recurse: yes

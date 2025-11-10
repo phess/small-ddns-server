@@ -1,0 +1,6 @@
+---
+- name: Install required RPMs
+  become: yes
+  become_user: root
+  ansible.builtin.package:
+    name: "{{ required_rpms }}"

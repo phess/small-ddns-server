@@ -1,0 +1,66 @@
+---
+## General variables
+
+# RPMs that are required on the host, e.g. podman
+required_rpms:
+  - podman
+
+ddns_domains:
+  - "example.com"
+
+ddns_fqdn: ddns.example.com
+ddns_admin_email: admin@example.com
+
+container_contents_base: "{{ ansible_env.HOME }}/ddns"
+
+## Application-wide vars
+## (prefix: ddns_)
+ddns_db_filename: hosts.db
+
+## CoreDNS i.e. DNS resolver settings
+## (prefix: coredns_)
+coredns_systemd_service_name: "ddns-coredns"
+#coredns_hosts_dir: "/etc/coredns"
+coredns_content_dir: "{{ container_contents_base }}/coredns"
+hostsfiles_dir: "{{ container_contents_base }}/hostsfiles"
+coredns_image: docker.io/coredns/coredns:latest
+coredns_image_pullpolicy: "{{ default_pull_policy | default('missing') }}"
+
+
+## HTTPS Listener service
+## (prefix: listener_)
+listener_image: quay.io/phezz/ddns-listener:latest
+listener_image_pullpolicy: "{{ default_pull_policy | default('missing') }}"
+listener_systemd_service_name: ddns-listener
+listener_https_port: 443
+listener_content_dir: "{{ container_contents_base }}/listener"
+listener_certs_dir: "{{ listener_content_dir }}"
+listener_ssl_cacert: "{{ listener_certs_dir }}/cacert.pem"
+listener_ssl_key: "{{ listener_certs_dir }}/tls_cert.key.pem"
+listener_ssl_cert: "{{ listener_certs_dir }}/tls_cert.crt.pem"
+
+## Listener DB
+listener_db_dir: "{{ listener_content_dir }}/db"
+
+
+ddns_packages:
+  - python3-aiohttp
+
+ddns_binpath: "/usr/bin"
+ddns_binfiles:
+  - "ddns-listener.py"
+  - "pubkey_from_ldap.sh"
+  - "ddns-cli-menu.py"
+
+ddns_configpath: "/etc"
+ddns_configfiles:
+  - "ddns.conf"
+
+dnsmasq_configpath: "/etc/dnsmasq.d"
+dnsmasq_configfiles:
+  - "ddns-sysmgmt.conf"
+
+ddns_datapath: "/var/lib/ddns"
+
+ddns_sshd_auth_script: "/bin/false"
+menu_script: "/usr/bin/env dbfile=/var/lib/ddns/db/hosts.db dns_domains=\"example.com\" max_shortname_length=60 ddns_port=443 admin_email=admin@example.com debug=no /usr/bin/ddns-cli-menu.py"

@@ -1,0 +1,6 @@
+---
+- name: Install DDNS to a host
+  hosts: ddns
+  gather_facts: yes
+  roles:
+    - small-ddns-installer

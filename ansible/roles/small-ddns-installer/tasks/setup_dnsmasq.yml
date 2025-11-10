@@ -1,0 +1,37 @@
+---
+# setup_dnsmasq.yml
+
+# - name: Install dnsmasq
+#   yum:
+#     name: dnsmasq
+#     state: latest
+
+- name: Create group ddns
+  group:
+    name: ddns
+    state: present
+    system: yes
+
+- name: Ensure hosts dir exists
+  file:
+    path: /etc/dnsmasq.d/hosts.d
+    state: directory
+    # sgid enabled, group is ddns, let group members write to this dir
+    mode: 2775
+    group: ddns
+
+- name: Deploy general dnsmasq config file, 00_general.conf
+  template:
+    src: 00_general.conf
+    dest: "{{ dnsmasq_configpath }}/"
+
+- name: Deploy sysmgmt-specific dnsmasq config file
+  copy:
+    src: ddns-sysmgmt.conf
+    dest: "{{ dnsmasq_configpath }}/"
+
+# - name: Start and enable dnsmasq service
+#   service:
+#     name: dnsmasq
+#     state: started
+#     enabled: yes

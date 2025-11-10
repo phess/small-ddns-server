@@ -1,0 +1,14 @@
+---
+# deploy_aux_scripts.yml
+
+- name: Deploy sql-to-hosts-file script
+  copy:
+    src: sql-to-hosts-file.sh
+    dest: "{{ ddns_binpath }}"
+    mode: 0755
+
+- name: Deploy db-seed script
+  copy:
+    src: ddns-server-db-seed.sh
+    dest: "{{ ddns_binpath }}"
+    mode: 0755

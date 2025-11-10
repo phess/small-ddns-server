@@ -1,0 +1,33 @@
+---
+# dbseed.yml
+
+- name: Create the db-seed command
+  ansible.builtin.set_fact:
+    sql_command: "
+             cat <<EOSQL | sqlite3 /var/lib/ddns/{{ ddns_db_filename }}
+             CREATE TABLE clients(
+                token TEXT PRIMARY KEY NOT NULL,
+                hostname TEXT NOT NULL,
+                owner TEXT NOT NULL,
+                ipaddress TEXT,
+                ip6address TEXT,
+                created_at TIMESTAMP NOT NULL,
+                last_update TIMESTAMP NOT NULL
+            );
+            EOSQL"
+
+- name: Seed the DB with initial testing data
+  containers.podman.podman_container:
+    name: ddns-dbseed
+    image: "{{ listener_image }}"
+    command: "{{ sql_command }}"
+    detach: false
+    rm: true
+    state: started
+    entrypoint: /bin/bash
+
+#- name: Seed the db
+  #ansible.builtin.command: "{{ ddns_binpath }}/ddns-server-db-seed.sh"
+  #ignore_errors: yes
+
+

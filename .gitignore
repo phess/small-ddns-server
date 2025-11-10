@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+ansible/inventory.ddns
+ansible/inventory.phess
+ansible/roles/small-ddns-installer/files/pubkey_from_ldap.sh

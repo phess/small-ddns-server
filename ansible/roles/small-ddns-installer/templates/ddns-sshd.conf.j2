@@ -1,0 +1,18 @@
+### DDNS sshd configuration
+
+## Use script /usr/local/bin/sshd-auth to authenticate DDNS users.
+## Note: the command always receives as the only argument the username trying to authenticate.
+AuthorizedKeysCommand /usr/local/bin/sshd-auth %u
+AuthorizedKeysCommandUser nobody
+
+
+## Non-DDNS users have no ForceCommand set.
+{% for non_ddns_user in ddns_excluded_usernames %}
+Match User {{ non_ddns_user }}
+        ForceCommand none
+
+## All other users are forced into the DDNS cli menu.
+Match User *
+        ForceCommand /usr/bin/env dbfile={{ listener_db_/var/lib/ddns/db/hosts.db dns_domains="lab.example.com" max_shortname_length=60 ddns_port=443 admin_email=ddns-admin@example.com debug=no /usr/bin/ddns-cli-menu.py
+
+
